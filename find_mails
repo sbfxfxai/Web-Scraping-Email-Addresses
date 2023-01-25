@@ -1,0 +1,48 @@
+import requests
+import re
+import time
+from typing import List
+from scrapy.http import HtmlResponse
+
+allLinks = set()
+mails = set()
+url = 'https://kore.ai/'
+
+def find_mails(soup: HtmlResponse) -> None:
+    for name in soup.css('a'):
+        email_text = name.get()
+        match = re.match(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', email_text)
+        if match:
+            email_text = email_text.replace(" ", '').replace('\r', '')
+            email_text = email_text.replace('\n', '').replace('\t', '')
+            mails.add(email_text)
+
+try:
+    response = requests.get(url, timeout=5)
+    soup = HtmlResponse(url=response.url, body=response.text, encoding='utf-8')
+    links = soup.css('a::attr(href)').getall()
+    for link in links:
+        if 'contact' in link.lower() or 'career' in link.lower() or 'about' in link.lower() or 'services' in link.lower():
+            allLinks.add(link)
+    
+    for link in allLinks:
+        if link.startswith("http") or link.startswith("www"):
+            time.sleep(1)
+            response = requests.get(link, timeout=5)
+            soup = HtmlResponse(url=response.url, body=response.text, encoding='utf-8')
+            find_mails(soup)
+        else:
+            new_url = url + link
+            time.sleep(1)
+            response = requests.get(new_url, timeout=5)
+            soup = HtmlResponse(url=response.url, body=response.text, encoding='utf-8')
+            find_mails(soup)
+
+except requests.exceptions.RequestException as e:
+    print(f'Error: {e}')
+
+if len(mails) == 0:
+    print("NO MAILS FOUND")
+else:
+    print(mails)
+
